@@ -6,7 +6,7 @@ import { parseCatalogParams } from "@/features/catalog/catalog-utils";
 import { getProducts } from "@/repositories/products";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Buscar productos", description: "Busca productos por nombre o SKU en Importadora Valiente." };
+export const metadata = { title: "Buscar productos", description: "Busca productos por nombre o SKU en Importadora Valiente.", robots: { index: false, follow: true } };
 
 export default async function SearchPage({ searchParams }) {
   const values = parseCatalogParams(await searchParams);

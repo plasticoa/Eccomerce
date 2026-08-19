@@ -1,7 +1,9 @@
 import "server-only";
 
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createPublicClient } from "@/lib/supabase/public";
+import { logServerError } from "@/lib/observability/logger";
 import {
   CATALOG_PAGE_SIZE,
   normalizeProduct,
@@ -13,7 +15,10 @@ const PRODUCT_SELECT = `
   name,
   slug,
   description,
+  seo_title,
+  seo_description,
   created_at,
+  updated_at,
   product_variants!inner(
     id,
     sku,
@@ -28,7 +33,7 @@ const PRODUCT_SELECT = `
 `;
 
 function reportCatalogError(operation, error) {
-  console.error(`[catalog:${operation}]`, { code: error?.code, message: error?.message });
+  logServerError("catalog.query.failed", error, { repository: "products", operation });
 }
 
 async function fetchProductsByIds(supabase, ids) {
@@ -63,7 +68,7 @@ export async function getProducts({
 } = {}) {
   const safePage = Math.max(1, Number(page) || 1);
   const safePageSize = Math.min(24, Math.max(1, Number(pageSize) || CATALOG_PAGE_SIZE));
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data: pageRows, error } = await supabase.rpc("catalog_product_page", {
     search_term: sanitizeSearchTerm(query) || null,
     category_slug: category || null,
@@ -109,8 +114,8 @@ export async function getProducts({
   };
 }
 
-export const getProductBySlug = cache(async function getProductBySlug(slug) {
-  const supabase = await createClient();
+const getCachedProductBySlug = unstable_cache(async function getCachedProductBySlug(slug) {
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
@@ -126,7 +131,8 @@ export const getProductBySlug = cache(async function getProductBySlug(slug) {
   if (!data) return null;
   const product = normalizeProduct(data);
   return product.variants.length ? product : null;
-});
+}, ["public-product-by-slug"], { revalidate: 300, tags: ["catalog-products"] });
+export const getProductBySlug = cache(getCachedProductBySlug);
 
 export async function getRelatedProducts(product, limit = 4) {
   const category = product.categories[0]?.slug;

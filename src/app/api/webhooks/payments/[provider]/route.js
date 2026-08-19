@@ -1,4 +1,5 @@
 import { createPaymentService } from "@/services/payment/payment-service.server";
+import { logServerError } from "@/lib/observability/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export async function POST(request, { params }) {
     if (code.startsWith("INVALID_") || code === "PAYMENT_PROVIDER_UNAVAILABLE" || code === "PAYMENT_TEST_WEBHOOK_SECRET_MISSING") {
       return Response.json({ error: "Evento no válido." }, { status: 400 });
     }
-    console.error("[payment:webhook]", { provider: providerName, code: error?.code || code });
+    logServerError("payment.webhook.failed", error, { route: "/api/webhooks/payments/[provider]", provider: providerName, result: "failed" });
     return Response.json({ error: "Error temporal al procesar el evento." }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 # Importadora Valiente — E-commerce
 
-Aplicación de comercio electrónico construida de forma incremental. La Iteración 2 incorpora el flujo de compra previo al pago sobre la base técnica, autenticación y catálogo existentes.
+MVP de comercio electrónico de Importadora Valiente. Incluye storefront, autenticación, carrito, checkout, pedidos, pago mediante adaptador, inventario, administración, personalización, promociones, SEO técnico y controles de release sobre Next.js y Supabase.
 
 ## Stack
 
@@ -11,6 +11,120 @@ Aplicación de comercio electrónico construida de forma incremental. La Iteraci
 - Vercel como destino de despliegue
 
 La arquitectura es un monolito modular: Next.js concentra UI, renderizado, Server Actions, Route Handlers y lógica de servidor; Supabase concentra identidad, datos, autorización y archivos.
+
+## Iteración 6 — Calidad y release
+
+La migración `supabase/migrations/202608100007_release_hardening_seo.sql` agrega SEO administrable a productos, categorías y configuración global, reemplaza las RPC de guardado para conservar atomicidad/auditoría e incorpora índices derivados de consultas reales. El storefront genera canonical, Open Graph, Twitter metadata, `/sitemap.xml` y `/robots.txt`; productos y categorías inactivos siguen excluidos por filtros explícitos y RLS.
+
+Los repositorios públicos usan un cliente Supabase anónimo sin cookies. Configuración, categorías, detalle de producto, banners y sitemap tienen caché compartida con límites de tiempo e invalidación por tags desde acciones administrativas. Cuenta, carrito autenticado, checkout, pedidos y datos administrativos no usan esta caché pública.
+
+La observabilidad backend emite eventos JSON estructurados sin stack traces ni secretos. `payment_webhook_events` conserva idempotencia/resultado del webhook y `audit_logs` registra operaciones críticas. La pantalla `global-error.js` muestra únicamente un mensaje seguro y el digest de Next.js.
+
+Comandos de release:
+
+```bash
+npm run validate:env
+npm run validate:env:production
+npm run release:check
+```
+
+La validación productiva requiere URL/clave pública de Supabase, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL` HTTPS y `PAYMENT_PROVIDER`. El repositorio todavía no incluye un gateway financiero productivo: `TestPaymentProvider` está bloqueado en producción, de modo que seleccionar/certificar el proveedor real continúa siendo un bloqueo externo.
+
+Documentación operativa:
+
+- `docs/DEPLOYMENT.md`: Supabase, Vercel, Auth, webhook, smoke tests y rollback.
+- `docs/SECURITY.md`: matriz RLS efectiva y pruebas de acceso cruzado.
+- `docs/BACKUP-RECOVERY.md`: política de respaldo/restauración dependiente del plan.
+- `docs/RELEASE-CHECKLIST.md`: evidencia manual y automatizada para autorizar producción.
+
+## Iteración 4 — Administración
+
+El panel administrativo está disponible bajo `/admin` y reutiliza las entidades y flujos de catálogo, compra, pago e inventario existentes. Todas sus páginas vuelven a validar sesión y rol en servidor; ocultar enlaces nunca es la barrera de autorización.
+
+### Rutas administrativas
+
+| Ruta | Admin | Operator | Función |
+|---|---:|---:|---|
+| `/admin/dashboard` | Sí | Sí | Métricas por 1, 7 o 30 días, pedidos y stock bajo |
+| `/admin/productos` | Sí | No | Búsqueda, filtros, publicación y edición |
+| `/admin/productos/nuevo` | Sí | No | Alta transaccional con primera variante e inventario |
+| `/admin/productos/[id]` | Sí | No | Producto, categorías, variantes, precios e imágenes |
+| `/admin/categorias` | Sí | No | Alta, edición y activación |
+| `/admin/inventario` | Sí | Lectura | Existencias, alertas, ajustes e historial |
+| `/admin/pedidos` | Sí | Sí | Listado paginado y filtros |
+| `/admin/pedidos/[id]` | Sí | Sí | Snapshots, cliente, pago, entrega y transiciones |
+| `/admin/clientes` | Sí | Sí | Búsqueda por nombre/correo y estadísticas mínimas |
+| `/admin/clientes/[id]` | Sí | Sí | Contacto, direcciones y pedidos recientes |
+| `/admin/usuarios` | Sí | No | Usuarios internos y asignación auditada de roles |
+
+`admin` opera catálogo, Storage, inventario y roles. `operator` consulta la operación y puede avanzar estados de pedido y entrega mediante RPCs validadas. `customer` no puede entrar a ninguna ruta administrativa. El último administrador no puede degradarse.
+
+### Operaciones críticas
+
+La migración `supabase/migrations/202608100005_admin.sql` agrega:
+
+- agregaciones de dashboard ejecutadas en PostgreSQL;
+- alta atómica de producto, primera variante, inventario y movimiento inicial;
+- edición auditada de variantes y precios;
+- ajuste de inventario con bloqueo de fila, rechazo de stock negativo y movimiento obligatorio;
+- máquina de estados de pedidos sin retrocesos arbitrarios;
+- actualización auditada de envíos;
+- cambio de rol auditado y protección del último administrador;
+- índices para estados, fechas, inventario y roles;
+- RLS diferenciada para `admin` y `operator`, incluida escritura de Storage solo para administradores.
+
+El panel no permite aprobar pagos manualmente. `payment_status`, idempotencia, webhooks y descuento de inventario de ventas continúan bajo la arquitectura de Iteración 3. Los detalles de pedido usan exclusivamente snapshots de `order_items`.
+
+### Imágenes
+
+La carga admite JPG, PNG y WebP de hasta 10 MB. La Server Action valida MIME/tamaño y genera una ruta aleatoria bajo `catalogo/{productId}/`; el navegador no elige la ruta de Storage. `next.config.mjs` eleva el límite del cuerpo de Server Actions a 11 MB exclusivamente para soportar este máximo.
+
+Aplica la migración después de las cuatro anteriores:
+
+```bash
+supabase db push
+```
+
+Para listar correos de clientes y usuarios internos, el servidor consulta Supabase Auth mediante `SUPABASE_SERVICE_ROLE_KEY`; esta clave nunca se serializa ni se usa en Client Components.
+
+## Iteración 5 — Personalización, promociones y configuración
+
+La tienda puede configurarse sin modificar código desde tres rutas exclusivas para `admin`:
+
+| Ruta | Función |
+|---|---|
+| `/admin/personalizacion` | Logotipo, favicon, colores, contenido de inicio y banners |
+| `/admin/promociones` | Alta, edición, vigencia, límites y activación de cupones |
+| `/admin/configuracion` | Comercio, contacto, redes, footer y métodos de entrega |
+
+La configuración pública se consulta una sola vez por solicitud y se comparte entre layout, metadata y página de inicio. El storefront aplica colores mediante CSS Custom Properties y utiliza valores seguros por defecto cuando la configuración todavía no existe. Header, favicon, home, banners, moneda y footer consumen datos de Supabase.
+
+Los archivos de identidad se guardan bajo `branding/identidad/{logo|favicon}/` y los banners bajo `banners/promociones/`. Las rutas son UUID generados por el servidor; se aceptan JPG, PNG y WebP. Reemplazar un archivo elimina el anterior después de confirmar la escritura en base de datos.
+
+### Cupones y checkout
+
+El checkout ofrece una validación previa para dar feedback, pero esa respuesta no es autoridad comercial. La función PostgreSQL `create_order_from_cart(...)` vuelve a:
+
+- bloquear carrito, inventario y cupón;
+- leer precios vigentes y el método de entrega activo;
+- validar estado, fechas, monto mínimo y límite de usos;
+- calcular descuento porcentual o fijo sin superar el subtotal;
+- guardar subtotal, descuento, envío, total y moneda en la orden;
+- insertar una única `coupon_redemption` ligada a la orden.
+
+El pago y el descuento de inventario de ventas continúan bajo el webhook confiable de Iteración 3.
+
+### Migración
+
+Aplica después de `202608100005_admin.sql`:
+
+```text
+supabase/migrations/202608100006_customization_promotions.sql
+```
+
+La migración amplía `site_settings` y `banners`, fortalece `coupons`, crea `shipping_methods`, agrega índices/RLS y reemplaza la firma anterior de `create_order_from_cart`. Antes de aplicarla, resuelve cualquier cupón duplicado que solo difiera por mayúsculas/minúsculas; la migración se detendrá de forma explícita para no alterar historial silenciosamente.
+
+No se agregaron variables de entorno. Se reutilizan las claves públicas de Supabase y `SUPABASE_SERVICE_ROLE_KEY` continúa aislada en servidor.
 
 ## Requisitos
 
@@ -34,6 +148,7 @@ Comandos de calidad y producción:
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm start
 ```
@@ -47,6 +162,9 @@ npm start
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Público | Compatibilidad con proyectos que aún usan anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor | Operaciones backend que omiten RLS |
 | `NEXT_PUBLIC_SITE_URL` | Público | Origen de la app, sin `/` final |
+| `PAYMENT_PROVIDER` | Solo servidor | Adaptador de pago; `test` únicamente fuera de producción |
+| `PAYMENT_TEST_WEBHOOK_SECRET` | Solo servidor | HMAC local del proveedor de prueba, mínimo 16 caracteres |
+| `PAYMENT_TEST_MODE_ENABLED` | Solo servidor | Habilita simulación exclusivamente fuera de producción |
 
 El código prioriza `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y usa `NEXT_PUBLIC_SUPABASE_ANON_KEY` como alternativa. No es necesario configurar ambas. La `service role` está aislada en `src/lib/supabase/admin.js`, que importa `server-only`; nunca debe llevar el prefijo `NEXT_PUBLIC_` ni usarse desde un Client Component.
 

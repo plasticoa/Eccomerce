@@ -5,9 +5,15 @@ import { ProductGrid } from "@/components/store/product-grid";
 import { getCategories } from "@/repositories/categories";
 import { getProducts } from "@/repositories/products";
 import { parseCatalogParams } from "@/features/catalog/catalog-utils";
+import { getPublicSettings } from "@/repositories/settings";
+import { buildPublicMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Productos", description: "Explora el catálogo público de Importadora Valiente por categoría, precio y disponibilidad." };
+export async function generateMetadata({ searchParams }) {
+  const [settings, params] = await Promise.all([getPublicSettings(), searchParams]);
+  const hasFilters = Object.values(params || {}).some(Boolean);
+  return buildPublicMetadata({ settings, title: "Productos", description: `Explora el catálogo público de ${settings.storeName} por categoría, precio y disponibilidad.`, path: "/productos", noIndex: hasFilters });
+}
 
 export default async function ProductsPage({ searchParams }) {
   const values = parseCatalogParams(await searchParams);

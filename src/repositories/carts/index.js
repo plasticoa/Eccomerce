@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getProductImageUrl } from "@/features/catalog/catalog-utils";
 import { calculateCartSubtotal } from "@/services/checkout/calculations";
+import { logServerError } from "@/lib/observability/logger";
 
 function unwrap(value) { return Array.isArray(value) ? value[0] : value; }
 
@@ -21,7 +22,7 @@ export async function validateCartItems(items = []) {
     .eq("active", true)
     .eq("products.active", true);
   if (error) {
-    console.error("[cart:validate]", { code: error.code, message: error.message });
+    logServerError("cart.validation.failed", error, { repository: "carts", operation: "validate" });
     throw new Error("CART_UNAVAILABLE");
   }
 

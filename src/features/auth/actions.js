@@ -3,13 +3,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeInternalPath } from "@/lib/validation/purchase";
+import { getSiteUrl } from "@/lib/site-url";
 
 function cleanEmail(value) {
   return String(value || "").trim().toLowerCase();
-}
-
-function siteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
 }
 
 export async function loginAction(_previousState, formData) {
@@ -38,7 +35,7 @@ export async function registerAction(_previousState, formData) {
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: `${siteUrl()}/auth/callback?next=/cuenta`,
+      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/cuenta`,
     },
   });
 
@@ -53,7 +50,7 @@ export async function recoverAction(_previousState, formData) {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl()}/auth/callback?next=/auth/actualizar-contrasena`,
+    redirectTo: `${getSiteUrl()}/auth/callback?next=/auth/actualizar-contrasena`,
   });
   if (error) return { error: "No fue posible enviar el enlace. Intenta nuevamente." };
   return { success: "Si el correo está registrado, recibirás instrucciones para restablecer tu contraseña." };

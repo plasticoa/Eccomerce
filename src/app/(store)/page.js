@@ -5,27 +5,30 @@ import { ProductGrid } from "@/components/store/product-grid";
 import { SearchBar } from "@/components/store/search-bar";
 import { getCategories } from "@/repositories/categories";
 import { getProducts } from "@/repositories/products";
+import { HomeBanners } from "@/components/store/home-banners";
+import { getPublicBanners, getPublicSettings } from "@/repositories/settings";
+import { buildPublicMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Importadora Valiente | Productos para cada proyecto",
-  description: "Descubre herramientas, soluciones para el hogar, iluminación, organización y jardín en Importadora Valiente.",
-};
+export async function generateMetadata(){const settings=await getPublicSettings();return buildPublicMetadata({settings,title:settings.seo.title,description:settings.seo.description,path:"/"});}
 
 export default async function HomePage() {
-  const [categories, catalog] = await Promise.all([
+  const [categories, catalog,settings,banners] = await Promise.all([
     getCategories({ limit: 4 }),
     getProducts({ pageSize: 8 }),
+    getPublicSettings(),
+    getPublicBanners(),
   ]);
   return (
     <>
       <section className="home-hero">
         <div className="shell home-hero-grid">
-          <div><p className="eyebrow">Importadora Valiente</p><h1>Soluciones valientes para cada proyecto.</h1><p className="hero-copy">Productos útiles para el hogar, el trabajo y esos planes que merecen empezar hoy.</p><div className="hero-actions"><Link className="button button-primary" href="/productos">Explorar productos</Link><Link className="button button-secondary" href="/categorias">Ver categorías</Link></div></div>
+          <div><p className="eyebrow">{settings.home.eyebrow}</p><h1>{settings.home.title}</h1><p className="hero-copy">{settings.home.subtitle}</p><div className="hero-actions">{settings.home.buttonText&&settings.home.buttonUrl?<Link className="button button-primary" href={settings.home.buttonUrl}>{settings.home.buttonText}</Link>:null}<Link className="button button-secondary" href="/categorias">Ver categorías</Link></div>{settings.home.additionalMessage?<p className="home-additional">{settings.home.additionalMessage}</p>:null}</div>
           <aside className="hero-search-card"><span>Encuentra lo que necesitas</span><h2>Busca por producto o código</h2><SearchBar /><p>Prueba “taladro”, “LED” o un SKU.</p></aside>
         </div>
       </section>
+      <HomeBanners banners={banners}/>
       <div className="shell"><CategoryNavigation categories={categories} /></div>
       <section className="store-section shell"><div className="section-heading"><div><p className="eyebrow">Explora por espacio</p><h2>Categorías principales</h2></div><Link href="/categorias">Ver todas</Link></div><div className="category-grid">{categories.map((category) => <CategoryCard key={category.id} category={category} />)}</div></section>
       <section className="store-section store-section-products"><div className="shell"><div className="section-heading"><div><p className="eyebrow">Recién incorporados</p><h2>Productos para descubrir</h2></div><Link href="/productos">Ver catálogo completo</Link></div><ProductGrid products={catalog.products} /></div></section>

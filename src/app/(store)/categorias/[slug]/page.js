@@ -6,13 +6,17 @@ import { ProductGrid } from "@/components/store/product-grid";
 import { parseCatalogParams } from "@/features/catalog/catalog-utils";
 import { getCategories, getCategoryBySlug } from "@/repositories/categories";
 import { getProducts } from "@/repositories/products";
+import { getPublicSettings } from "@/repositories/settings";
+import { buildPublicMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const category = await getCategoryBySlug(slug);
-  return category ? { title: category.name, description: category.description || `Productos de ${category.name} en Importadora Valiente.` } : { title: "Categoría no encontrada" };
+  const [category, settings] = await Promise.all([getCategoryBySlug(slug), getPublicSettings()]);
+  return category
+    ? buildPublicMetadata({ settings, title: category.seoTitle || category.name, description: category.seoDescription || category.description || `Productos de ${category.name} en ${settings.storeName}.`, path: `/categorias/${category.slug}` })
+    : buildPublicMetadata({ settings, title: "Categoría no encontrada", path: `/categorias/${slug}`, noIndex: true });
 }
 
 export default async function CategoryPage({ params, searchParams }) {

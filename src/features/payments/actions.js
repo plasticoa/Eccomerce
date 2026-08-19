@@ -7,6 +7,7 @@ import { isUuid } from "@/lib/validation/purchase";
 import { getPaymentForCurrentUser } from "@/repositories/payments";
 import { createPaymentService } from "@/services/payment/payment-service.server";
 import { createPaymentProvider, isTestSimulationEnabled } from "@/services/payment/payment-config";
+import { logServerError } from "@/lib/observability/logger";
 
 const ORDER_NUMBER_PATTERN = /^IV-\d{4}-\d{6,}$/;
 const TEST_OUTCOMES = new Set(["approved", "failed", "cancelled", "pending"]);
@@ -33,7 +34,7 @@ export async function startPaymentAction(_state, formData) {
     revalidatePath(`/pedido/confirmacion/${orderNumber}`);
     return { success: "Intento de pago creado.", payment };
   } catch (error) {
-    console.error("[payment:start]", { code: error?.code || error?.message || "UNKNOWN" });
+    logServerError("payment.start.failed", error, { action: "startPayment", orderNumber });
     return { error: friendlyPaymentError(error) };
   }
 }
@@ -70,7 +71,7 @@ export async function simulateTestPaymentAction(_state, formData) {
     if (result.state === "payment_review") return { error: "El pago fue aprobado, pero el pedido requiere revisión por inventario o consistencia.", orderNumber: payment.orderNumber };
     return { success: `Evento ${outcome} procesado.`, orderNumber: payment.orderNumber, result };
   } catch (error) {
-    console.error("[payment:test-simulation]", { code: error?.code || error?.message || "UNKNOWN", paymentId });
+    logServerError("payment.test_simulation.failed", error, { action: "simulateTestPayment", paymentId });
     return { error: "No pudimos procesar el evento de prueba." };
   }
 }

@@ -5,9 +5,11 @@ import { formatCurrency, getVariantAvailability } from "@/features/catalog/catal
 import { ProductAvailability } from "./product-availability";
 import { QuantitySelector } from "@/components/cart/quantity-selector";
 import { useCart } from "@/components/cart/cart-provider";
+import { useStoreSettings } from "./store-settings-provider";
 
 export function ProductVariantSelector({ variants }) {
   const { addItem, busy, message } = useCart();
+  const {currency}=useStoreSettings();
   const [selectedId, setSelectedId] = useState(variants.length === 1 ? variants[0].id : "");
   const [quantity, setQuantity] = useState(1);
   const selected = variants.find((variant) => variant.id === selectedId) || null;
@@ -33,8 +35,8 @@ export function ProductVariantSelector({ variants }) {
       {selected ? (
         <div className="selected-variant" aria-live="polite">
           <div className="detail-price">
-            <strong>{formatCurrency(selected.price)}</strong>
-            {selected.compareAtPrice > selected.price ? <del>{formatCurrency(selected.compareAtPrice)}</del> : null}
+            <strong>{formatCurrency(selected.price,currency)}</strong>
+            {selected.compareAtPrice > selected.price ? <del>{formatCurrency(selected.compareAtPrice,currency)}</del> : null}
           </div>
           <dl>
             <div><dt>Presentación</dt><dd>{selected.name}</dd></div>

@@ -1,9 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { logServerError } from "@/lib/observability/logger";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
-import { DELIVERY_METHODS, PAYMENT_METHODS } from "@/services/checkout/calculations";
+import { PAYMENT_METHODS } from "@/services/checkout/calculations";
 import { isUuid } from "@/lib/validation/purchase";
 
 function checkoutError(error) {
@@ -12,6 +13,12 @@ function checkoutError(error) {
   if (message.includes("ADDRESS_NOT_FOUND")) return "Selecciona una dirección válida.";
   if (message.includes("INSUFFICIENT_STOCK")) return "Cambió la disponibilidad de uno de los productos. Revisa tu carrito.";
   if (message.includes("UNAVAILABLE")) return "Uno de los productos ya no está disponible.";
+  if (message.includes("COUPON_NOT_FOUND")) return "El cupón no existe.";
+  if (message.includes("COUPON_INACTIVE")) return "El cupón está inactivo.";
+  if (message.includes("COUPON_EXPIRED")) return "El cupón expiró.";
+  if (message.includes("COUPON_NOT_STARTED")) return "El cupón todavía no está vigente.";
+  if (message.includes("COUPON_MINIMUM")) return "El pedido no alcanza el monto mínimo del cupón.";
+  if (message.includes("COUPON_LIMIT_REACHED")) return "El cupón alcanzó su límite de usos.";
   return "No pudimos crear el pedido. Revisa los datos e intenta nuevamente.";
 }
 
@@ -21,15 +28,16 @@ export async function createOrderAction(_state, formData) {
   const deliveryMethod = String(formData.get("deliveryMethod") || "");
   const paymentMethod = String(formData.get("paymentMethod") || "");
   const checkoutToken = String(formData.get("checkoutToken") || "");
-  if (!isUuid(addressId) || !isUuid(checkoutToken) || !DELIVERY_METHODS[deliveryMethod] || !PAYMENT_METHODS[paymentMethod]) return { error: "Completa las opciones del pedido." };
+  const couponCode=String(formData.get("couponCode")||"").trim().toUpperCase();
+  if (!isUuid(addressId) || !isUuid(checkoutToken) || !/^[a-z_]{3,40}$/.test(deliveryMethod) || !PAYMENT_METHODS[paymentMethod] || (couponCode&&!/^[A-Z0-9_-]{3,40}$/.test(couponCode))) return { error: "Completa las opciones del pedido." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_order_from_cart", {
     p_address_id: addressId, p_delivery_method: deliveryMethod,
-    p_payment_method: paymentMethod, p_checkout_token: checkoutToken,
+    p_payment_method: paymentMethod, p_checkout_token: checkoutToken,p_coupon_code:couponCode||null,
   });
   if (error || !data?.orderNumber) {
-    console.error("[checkout:create-order]", { code: error?.code || "NO_ORDER_NUMBER" });
+    logServerError("checkout.order.failed", error, { action: "createOrder", result: "failed" });
     return { error: checkoutError(error) };
   }
   redirect(`/pedido/confirmacion/${encodeURIComponent(data.orderNumber)}`);

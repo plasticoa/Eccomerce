@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getOrderByNumber } from "@/repositories/orders";
 import { paymentPublicConfig } from "@/services/payment/payment-config";
 
-export const metadata = { title: "Resultado del pago" };
+export const metadata = { title: "Resultado del pago", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function PaymentResultPage({ searchParams }) {

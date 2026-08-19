@@ -11,13 +11,13 @@ export function calculateCartSubtotal(items) {
   return items.reduce((total, item) => total + Number(item.price) * Number(item.quantity), 0);
 }
 
-export function calculateCheckoutTotals(items, deliveryMethod) {
+export function calculateCheckoutTotals(items, deliveryMethod, methods = Object.values(DELIVERY_METHODS), couponDiscount = 0) {
   if (!items.length) throw new Error("EMPTY_CART");
-  const method = DELIVERY_METHODS[deliveryMethod];
+  const method = Array.isArray(methods) ? methods.find((candidate) => candidate.id === deliveryMethod) : methods[deliveryMethod];
   if (!method) throw new Error("INVALID_DELIVERY_METHOD");
   const subtotal = calculateCartSubtotal(items);
-  const discount = 0;
-  const shipping = method.price;
+  const discount = Math.max(0, Math.min(subtotal, Number(couponDiscount) || 0));
+  const shipping = Number(method.price);
   return { subtotal, discount, shipping, total: subtotal - discount + shipping };
 }
 

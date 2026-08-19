@@ -5,14 +5,17 @@ import { ProductGrid } from "@/components/store/product-grid";
 import { ProductPrice } from "@/components/store/product-price";
 import { ProductVariantSelector } from "@/components/store/product-variant-selector";
 import { getProductBySlug, getRelatedProducts } from "@/repositories/products";
+import { getProductImageUrl } from "@/features/catalog/catalog-utils";
+import { getPublicSettings } from "@/repositories/settings";
+import { buildPublicMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
-  if (!product) return { title: "Producto no encontrado" };
-  return { title: product.name, description: (product.description || `Conoce ${product.name} en Importadora Valiente.`).slice(0, 155) };
+  const [product, settings] = await Promise.all([getProductBySlug(slug), getPublicSettings()]);
+  if (!product) return buildPublicMetadata({ settings, title: "Producto no encontrado", path: `/productos/${slug}`, noIndex: true });
+  return buildPublicMetadata({ settings, title: product.seoTitle || product.name, description: product.seoDescription || product.description || `Conoce ${product.name} en ${settings.storeName}.`, path: `/productos/${product.slug}`, image: getProductImageUrl(product.images[0]?.path) });
 }
 
 export default async function ProductDetailPage({ params }) {

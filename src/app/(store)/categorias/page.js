@@ -1,8 +1,10 @@
 import { CategoryCard } from "@/components/store/category-card";
 import { getCategories } from "@/repositories/categories";
+import { getPublicSettings } from "@/repositories/settings";
+import { buildPublicMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Categorías", description: "Navega el catálogo de Importadora Valiente por categorías activas." };
+export async function generateMetadata() { const settings = await getPublicSettings(); return buildPublicMetadata({ settings, title: "Categorías", description: `Navega el catálogo de ${settings.storeName} por categorías activas.`, path: "/categorias" }); }
 
 export default async function CategoriesPage() {
   const categories = await getCategories();

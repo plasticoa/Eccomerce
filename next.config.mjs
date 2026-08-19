@@ -12,6 +12,7 @@ const supabaseHostname = (() => {
 const nextConfig = {
   allowedDevOrigins: ["192.168.56.1"],
   poweredByHeader: false,
+  experimental: { serverActions: { bodySizeLimit: "11mb" } },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "placehold.co", pathname: "/**" },

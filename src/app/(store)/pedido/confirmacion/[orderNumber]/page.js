@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getOrderByNumber } from "@/repositories/orders";
 import { paymentPublicConfig } from "@/services/payment/payment-config";
 
-export const metadata = { title: "Pedido confirmado" };
+export const metadata = { title: "Pedido confirmado", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function ConfirmationPage({ params }) {
