@@ -1,0 +1,1 @@
+export default function CheckoutLoading() { return <div className="checkout-page shell"><div className="loading-heading" /><div className="detail-skeleton"><div /><section><i /><i /><i /></section></div></div>; }

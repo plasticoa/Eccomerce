@@ -1,0 +1,1 @@
+export default function CartLoading() { return <main className="cart-page shell"><div className="loading-heading" /><div className="detail-skeleton"><div /><section><i /><i /><i /></section></div></main>; }

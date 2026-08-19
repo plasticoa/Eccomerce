@@ -1,0 +1,23 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+
+# production
+/build
+
+# environment files (the example is intentionally versioned)
+.env*
+!.env.example
+
+# Vercel
+.vercel
+
+# logs and OS files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
