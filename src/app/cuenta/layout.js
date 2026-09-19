@@ -6,6 +6,7 @@ import { logoutAction } from "@/features/auth/actions";
 const links = [["Resumen", "/cuenta"], ["Perfil", "/cuenta/perfil"], ["Direcciones", "/cuenta/direcciones"], ["Pedidos", "/cuenta/pedidos"]];
 
 export const metadata = { title: "Mi cuenta", robots: { index: false, follow: false } };
+export const dynamic = "force-dynamic";
 
 export default async function AccountLayout({ children }) {
   const [user, profile] = await Promise.all([getCurrentUser(), getCurrentProfile()]);

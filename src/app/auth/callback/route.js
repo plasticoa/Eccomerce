@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { safeInternalPath } from "@/lib/validation/purchase";
 
 export async function GET(request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const requestedNext = url.searchParams.get("next") || "/cuenta";
-  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/cuenta";
+  const next = safeInternalPath(requestedNext);
 
   if (code) {
     const supabase = await createClient();

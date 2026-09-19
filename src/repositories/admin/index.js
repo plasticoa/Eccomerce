@@ -1,6 +1,5 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin, requireInternal } from "@/services/admin/authorization";
 import { normalizeAdminPage } from "@/lib/validation/admin";
 import { sanitizeSearchTerm } from "@/features/catalog/catalog-utils";
@@ -20,6 +19,11 @@ function result(data, count, page) {
 function dbError(area, error) {
   logServerError("admin.query.failed", error, { repository: "admin", area });
   throw new Error("ADMIN_DATA_UNAVAILABLE");
+}
+
+function contactSearch(value) {
+  // Keep email punctuation; remove PostgREST filter grammar and wildcards.
+  return String(value || "").normalize("NFKC").replace(/[^\p{L}\p{N}\s@.+-]/gu, "").trim().slice(0, 80);
 }
 
 export async function getDashboard(days = 30) {
@@ -47,7 +51,8 @@ export async function getAdminProducts({ query = "", status = "all", page = 1 } 
   let productIds = [];
   const search = sanitizeSearchTerm(query);
   if (search) {
-    const { data: variants } = await supabase.from("product_variants").select("product_id").ilike("sku", `%${search}%`).limit(100);
+    const { data: variants, error } = await supabase.from("product_variants").select("product_id").ilike("sku", `%${search}%`).limit(100);
+    if (error) dbError("product-search", error);
     productIds = [...new Set((variants || []).map((row) => row.product_id))];
   }
   let queryBuilder = supabase.from("products").select("id, name, slug, active, created_at, updated_at, product_categories(categories(id,name)), product_variants(id,sku,variant_name,price,active,inventory(quantity,low_stock_threshold))", { count: "exact" });
@@ -101,46 +106,43 @@ export async function getAdminOrder(id) {
   const { data, error } = await supabase.from("orders").select("id,profile_id,order_number,status,payment_status,subtotal,discount,shipping_total,total,currency,shipping_address,delivery_method,payment_method,created_at,profiles(id,full_name,phone),order_items(id,sku_snapshot,name_snapshot,variant_name_snapshot,unit_price,quantity,line_total),coupon_redemptions(amount_discounted,coupons(code)),payments(id,provider,provider_reference,provider_status,status,amount,currency,processed_at,created_at),shipments(id,status,delivery_method,carrier,tracking_number,estimated_at,shipped_at,delivered_at,notes)").eq("id", id).maybeSingle();
   if (error) dbError("order", error);
   if (!data) return null;
-  const admin = createAdminClient();
-  const authUser = data.profile_id ? await admin.auth.admin.getUserById(data.profile_id) : null;
-  return { ...data, customerEmail: authUser?.data?.user?.email || "" };
-}
-
-async function profilesWithEmails(rows) {
-  const admin = createAdminClient();
-  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (error) dbError("auth-users", error);
-  const emails = new Map((data.users || []).map((user) => [user.id, user.email]));
-  return rows.map((row) => ({ ...row, email: emails.get(row.id) || "" }));
+  const { data: contact, error: contactError } = data.profile_id
+    ? await supabase.from("profiles").select("email").eq("id", data.profile_id).maybeSingle()
+    : { data: null, error: null };
+  if (contactError) dbError("order-contact", contactError);
+  return { ...data, customerEmail: contact?.email || "" };
 }
 
 export async function getCustomers({ query = "", page = 1 } = {}) {
   const { supabase } = await requireInternal();
   const range = rangeFor(page);
-  let builder = supabase.from("profiles").select("id,full_name,phone,created_at,orders(id,total,payment_status)", { count: "exact" }).eq("role", "customer");
+  let builder = supabase.from("profiles").select("id,full_name,email,phone,created_at,orders(id,total,payment_status)", { count: "exact" }).eq("role", "customer");
   if (query) {
-    const rawSearch = String(query).trim().slice(0, 80);
-    const search = sanitizeSearchTerm(rawSearch);
-    const admin = createAdminClient();
-    const { data: authData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const emailIds = (authData?.users || []).filter((user) => user.email?.toLowerCase().includes(rawSearch.toLowerCase())).map((user) => user.id);
-    builder = builder.or(`full_name.ilike.%${search}%${emailIds.length ? `,id.in.(${emailIds.join(",")})` : ""}`);
+    const search = contactSearch(query);
+    if (search) builder = builder.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
   }
   const { data, error, count } = await builder.order("created_at", { ascending: false }).range(range.from, range.to);
   if (error) dbError("customers", error);
-  return { ...result(await profilesWithEmails(data || []), count, range.page) };
+  return result(data, count, range.page);
 }
 
 export async function getCustomer(id) {
   const { supabase } = await requireInternal();
-  const { data, error } = await supabase.from("profiles").select("id,full_name,phone,role,created_at,addresses(id,label,recipient_name,phone,line_1,line_2,city,state_region,postal_code,country_code,is_default),orders(id,order_number,status,payment_status,total,currency,created_at)").eq("id", id).eq("role", "customer").maybeSingle();
+  const { data, error } = await supabase.from("profiles").select("id,full_name,email,phone,role,created_at,orders(id,order_number,status,payment_status,total,currency,created_at)").eq("id", id).eq("role", "customer").maybeSingle();
   if (error) dbError("customer", error);
-  return data ? (await profilesWithEmails([data]))[0] : null;
+  if (!data) return null;
+  const addresses = await supabase.rpc("admin_customer_addresses", { p_profile_id: id });
+  if (addresses.error) dbError("customer-addresses", addresses.error);
+  return { ...data, addresses: addresses.data || [] };
 }
 
-export async function getInternalUsers() {
+export async function getInternalUsers({ query = "", page = 1 } = {}) {
   const { supabase } = await requireAdmin();
-  const { data, error } = await supabase.from("profiles").select("id,full_name,phone,role,created_at").order("created_at", { ascending: false }).limit(1000);
+  const range = rangeFor(page);
+  let builder = supabase.from("profiles").select("id,full_name,email,role,created_at", { count: "exact" });
+  const search = contactSearch(query);
+  if (search) builder = builder.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+  const { data, error, count } = await builder.order("created_at", { ascending: false }).order("id").range(range.from, range.to);
   if (error) dbError("users", error);
-  return profilesWithEmails(data || []);
+  return result(data, count, range.page);
 }

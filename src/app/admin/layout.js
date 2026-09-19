@@ -4,6 +4,7 @@ import { logoutAction } from "@/features/auth/actions";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 
 export const metadata = { title: "Administración", robots: { index: false, follow: false } };
+export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }) {
   const user = await getCurrentUser();

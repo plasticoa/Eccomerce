@@ -9,6 +9,7 @@ export async function createClient() {
   const { url, key } = getPublicSupabaseConfig();
 
   return createServerClient(url, key, {
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
     cookies: {
       getAll() {
         return cookieStore.getAll();

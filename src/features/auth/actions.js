@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeInternalPath } from "@/lib/validation/purchase";
 import { getSiteUrl } from "@/lib/site-url";
+import { logServerError } from "@/lib/observability/logger";
 
 function cleanEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -70,6 +71,10 @@ export async function updatePasswordAction(_previousState, formData) {
 
 export async function logoutAction() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    logServerError("auth.logout.failed", { code: error.code || "LOGOUT_FAILED" });
+    throw new Error("LOGOUT_FAILED");
+  }
   redirect("/auth/login");
 }

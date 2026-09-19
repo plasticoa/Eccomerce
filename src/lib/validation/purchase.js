@@ -45,5 +45,5 @@ export function validateAddressInput(input) {
 
 export function safeInternalPath(value, fallback = "/cuenta") {
   const path = String(value || "");
-  return path.startsWith("/") && !path.startsWith("//") ? path : fallback;
+  return path.startsWith("/") && !path.startsWith("//") && !/[\\\u0000-\u0020\u007f]/.test(path) ? path : fallback;
 }

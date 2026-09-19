@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireUser } from "@/lib/auth";
 
 function paymentError(error, fallback) {
   const wrapped = new Error(fallback);
@@ -32,11 +33,12 @@ export async function setPaymentProviderReference({ paymentId, providerReference
 }
 
 export async function getPaymentForCurrentUser(paymentId) {
-  const supabase = await createClient();
+  const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("payments")
     .select("id, provider, provider_reference, status, amount, currency, processed_at, created_at, orders!inner(order_number, profile_id, status, payment_status)")
     .eq("id", paymentId)
+    .eq("orders.profile_id", user.id)
     .maybeSingle();
   if (error) throw paymentError(error, "PAYMENT_READ_FAILED");
   if (!data) return null;
