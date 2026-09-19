@@ -83,7 +83,7 @@ export function normalizeProduct(row) {
         price: Number(variant.price),
         compareAtPrice: variant.compare_at_price == null ? null : Number(variant.compare_at_price),
         active: Boolean(variant.active),
-        quantity: Number(inventory.quantity || 0),
+        quantity: Math.max(0, Number(inventory.quantity || 0) - Number(inventory.reserved_quantity || 0)),
         lowStockThreshold: Number(inventory.low_stock_threshold || 0),
       };
     })
@@ -120,6 +120,8 @@ export function normalizeProduct(row) {
     variants,
     images,
     categories,
+    tags: (row.product_tags || []).map((relation) => unwrapRelation(relation.tags)).filter(Boolean)
+      .map((tag) => ({ id: tag.id, name: tag.name, slug: tag.slug })),
     minPrice,
     maxPrice,
     hasPriceRange: variants.length > 1 && minPrice !== maxPrice,
@@ -129,10 +131,10 @@ export function normalizeProduct(row) {
 }
 
 export function getProductImageUrl(path) {
-  if (!path) return "https://placehold.co/900x900/F3EFE4/174C35/png?text=Importadora+Valiente";
+  if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
   const base = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-  if (!base) return "https://placehold.co/900x900/F3EFE4/174C35/png?text=Sin+imagen";
+  if (!base) return null;
   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
   return `${base}/storage/v1/object/public/products/${encodedPath}`;
 }

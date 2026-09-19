@@ -8,9 +8,7 @@ const missing = [];
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) missing.push("NEXT_PUBLIC_SUPABASE_URL");
 if (!publicKey) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY o NEXT_PUBLIC_SUPABASE_ANON_KEY");
-if (production && !process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
 if (production && !process.env.NEXT_PUBLIC_SITE_URL) missing.push("NEXT_PUBLIC_SITE_URL");
-if (production && !process.env.PAYMENT_PROVIDER) missing.push("PAYMENT_PROVIDER");
 
 for (const [name, value] of [["NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL], ["NEXT_PUBLIC_SITE_URL", process.env.NEXT_PUBLIC_SITE_URL]]) {
   if (!value) continue;

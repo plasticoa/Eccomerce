@@ -17,7 +17,7 @@ export async function validateCartItems(items = []) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("product_variants")
-    .select(`id, sku, variant_name, price, active, inventory(quantity, low_stock_threshold), products!inner(id, name, slug, active, product_images(id, storage_path, alt_text, sort_order, is_primary))`)
+    .select(`id, sku, variant_name, price, active, inventory(quantity, reserved_quantity, low_stock_threshold), products!inner(id, name, slug, active, product_images(id, storage_path, alt_text, sort_order, is_primary))`)
     .in("id", ids)
     .eq("active", true)
     .eq("products.active", true);
@@ -36,7 +36,7 @@ export async function validateCartItems(items = []) {
     }
     const product = unwrap(row.products);
     const inventory = unwrap(row.inventory) || {};
-    const stock = Number(inventory.quantity || 0);
+    const stock = Math.max(0, Number(inventory.quantity || 0) - Number(inventory.reserved_quantity || 0));
     const quantity = Math.min(raw.quantity, Math.max(stock, 1));
     if (stock < 1) warnings.push(`${product.name} está agotado.`);
     else if (quantity !== raw.quantity) warnings.push(`Ajustamos ${product.name} al stock disponible.`);

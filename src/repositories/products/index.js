@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { unstable_cache } from "next/cache";
+
 import { createPublicClient } from "@/lib/supabase/public";
 import { logServerError } from "@/lib/observability/logger";
 import {
@@ -26,10 +26,11 @@ const PRODUCT_SELECT = `
     price,
     compare_at_price,
     active,
-    inventory(quantity, low_stock_threshold)
+    inventory(quantity, reserved_quantity, low_stock_threshold)
   ),
   product_images(id, storage_path, alt_text, sort_order, is_primary),
-  product_categories(category_id, categories(id, name, slug))
+  product_categories(category_id, categories(id, name, slug)),
+  product_tags(tags(id, name, slug))
 `;
 
 function reportCatalogError(operation, error) {
@@ -114,7 +115,7 @@ export async function getProducts({
   };
 }
 
-const getCachedProductBySlug = unstable_cache(async function getCachedProductBySlug(slug) {
+async function getCachedProductBySlug(slug) {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("products")
@@ -131,7 +132,7 @@ const getCachedProductBySlug = unstable_cache(async function getCachedProductByS
   if (!data) return null;
   const product = normalizeProduct(data);
   return product.variants.length ? product : null;
-}, ["public-product-by-slug"], { revalidate: 300, tags: ["catalog-products"] });
+}
 export const getProductBySlug = cache(getCachedProductBySlug);
 
 export async function getRelatedProducts(product, limit = 4) {

@@ -13,6 +13,9 @@ function friendly(error, fallback) {
   if (text.includes("duplicate") || text.includes("23505")) return "El slug o SKU ya existe.";
   if (text.includes("INSUFFICIENT_STOCK")) return "El inventario disponible es insuficiente.";
   if (text.includes("INVALID_ORDER_TRANSITION")) return "La transición de estado no está permitida.";
+  if (text.includes("AMOUNT_MISMATCH")) return "El monto recibido debe coincidir con el total del pedido.";
+  if (text.includes("PAID_ORDER_REQUIRES_RETURN")) return "Un pedido pagado requiere una devolución explícita; no se puede cancelar aquí.";
+  if (text.includes("LEGACY_ORDER_REQUIRES_REVIEW")) return "Este pedido histórico requiere revisar su pago e inventario antes de continuar.";
   if (text.includes("LAST_ADMIN")) return "No puedes quitar el acceso al último administrador.";
   if (text.includes("FORBIDDEN")) return "No tienes permisos para realizar esta operación.";
   return fallback;
@@ -108,6 +111,7 @@ export async function changeOrderStatusAction(_state, formData) {
     const { error } = await supabase.rpc("admin_change_order_status", { p_order_id: orderId, p_next_status: nextStatus });
     if (error) throw error;
     revalidatePath(`/admin/pedidos/${orderId}`); revalidatePath("/admin/pedidos");
+    refreshCatalog(); revalidatePath("/", "layout");
     return { success: "Estado del pedido actualizado." };
   } catch (error) { return { error: friendly(error, "No se pudo actualizar el pedido.") }; }
 }
@@ -186,4 +190,20 @@ export async function updateProductImageAction(formData) {
     }
   }
   refreshCatalog(); revalidatePath(`/admin/productos/${productId}`); revalidatePath("/productos");
+}
+
+export async function recordPaymentAction(_state, formData) {
+  try {
+    const { supabase } = await requireAdmin();
+    const orderId = String(formData.get("orderId") || "");
+    const amount = Number(formData.get("amount"));
+    const reference = String(formData.get("reference") || "").trim();
+    const notes = String(formData.get("notes") || "").trim();
+    if (!isAdminUuid(orderId) || !Number.isFinite(amount) || amount < 0 || reference.length > 200 || notes.length > 1000) return { error: "Datos de pago no válidos." };
+    const { data, error } = await supabase.rpc("admin_record_payment", { p_order_id: orderId, p_amount: amount, p_reference: reference || null, p_notes: notes || null });
+    if (error) throw error;
+    refreshCatalog();
+    revalidatePath("/", "layout");
+    return { success: data.alreadyPaid ? "El pago ya estaba registrado." : "Pago registrado y salida de inventario confirmada." };
+  } catch (error) { return { error: friendly(error, "No se pudo registrar el pago.") }; }
 }

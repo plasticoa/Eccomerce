@@ -30,8 +30,8 @@ test("ajustes exigen cantidad positiva, tipo permitido y motivo", () => {
 });
 
 test("transiciones administrativas rechazan retrocesos arbitrarios", () => {
-  assert.deepEqual(allowedOrderTransitions("confirmed"), ["processing"]);
-  assert.deepEqual(allowedOrderTransitions("shipped"), ["delivered"]);
+  assert.deepEqual(allowedOrderTransitions("confirmed"), ["processing", "cancelled"]);
+  assert.deepEqual(allowedOrderTransitions("shipped"), ["delivered", "cancelled"]);
   assert.deepEqual(allowedOrderTransitions("delivered"), []);
   assert.equal(ADMIN_ROLES.includes("root"), false);
 });

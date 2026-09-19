@@ -25,7 +25,7 @@ Verifica los buckets públicos `products`, `branding` y `banners`. La lectura es
 
 ## 4. Configurar variables
 
-Carga en Vercel las variables de `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, secretos de webhook y credenciales del proveedor son secretos de servidor y nunca deben usar `NEXT_PUBLIC_`. Ejecuta localmente:
+Carga en Vercel las variables de `.env.example`. `SUPABASE_SERVICE_ROLE_KEY` es un secreto de servidor y nunca debe usar `NEXT_PUBLIC_`. El checkout y los pagos manuales usan la sesión autenticada y no requieren esa clave ni variables PAYMENT_*. Ejecuta localmente:
 
 ```bash
 npm run validate:env
@@ -36,9 +36,9 @@ La segunda validación debe pasar con el conjunto productivo antes de autorizar 
 
 ## 5. Configurar entornos Vercel
 
-- Local: Supabase local o proyecto de desarrollo, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, proveedor `test` opcional.
-- Preview: proyecto Supabase de staging, URL propia de preview y secretos sandbox. Nunca webhooks productivos.
-- Production: Supabase productivo, dominio definitivo y proveedor real. `PAYMENT_TEST_MODE_ENABLED` debe quedar ausente o `false`.
+- Local: Supabase local o proyecto de desarrollo, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, pagos manuales.
+- Preview: proyecto Supabase de staging, URL propia de preview y pagos manuales de prueba.
+- Production: Supabase productivo, dominio definitivo y pagos manuales; no configurar proveedor ni webhook.
 
 Mantén el Build Command predeterminado `npm run build` y no habilites `ignoreBuildErrors` ni omitas ESLint.
 
@@ -46,11 +46,9 @@ Mantén el Build Command predeterminado `npm run build` y no habilites `ignoreBu
 
 En Supabase Auth configura el dominio definitivo como Site URL y permite exactamente `https://DOMINIO/auth/callback`. Agrega previews solo al proyecto staging. Verifica registro, confirmación de correo, login, logout, persistencia de sesión y recuperación. Configura SMTP productivo antes de depender de correos transaccionales.
 
-## 7. Configurar el webhook de pago
+## 7. Activar pedidos con reservas
 
-Endpoint: `POST https://DOMINIO/api/webhooks/payments/{provider}`.
-
-El adaptador debe verificar la firma sobre el cuerpo raw, normalizar `eventId`, referencia, estado, monto y moneda, y procesar eventos equivalentes a actualización de pago. El repositorio solo incluye `TestPaymentProvider`, bloqueado en producción; seleccionar e implementar el gateway real, sus secretos y eventos oficiales es un bloqueo externo. Nunca copies el secreto en el cliente o en esta guía.
+Aplicar todas las migraciones en orden, incluida `202609190003_manual_payments_reservations.sql`, antes de desplegar la aplicación. La migración retira las RPC de pasarela, conserva el historial y marca pedidos anteriores como `legacy`; revisar esos pedidos antes de intentar registrar pagos. El endpoint de webhook responde 410 sin modificar datos. Ver [operación y pruebas](MANUAL-PAYMENTS.md).
 
 ## 8. Verificación previa
 
@@ -69,17 +67,17 @@ Despliega primero a Preview/staging. Cuando los smoke tests pasen, promueve exac
 
 Visitante: inicio, banners, catálogo, búsqueda, filtros, producto publicado y carrito. Confirma 404 para un producto inactivo.
 
-Cliente: registro/login, perfil, dirección, checkout, cupón válido/inválido, método de entrega, pedido, pago sandbox autorizado y consulta del pedido. Con Cliente A intenta abrir el pedido/dirección de Cliente B: debe obtener 404/sin datos.
+Cliente: registro/login, perfil, dirección, checkout, cupón válido/inválido, método de entrega, pedido, pago contra entrega/presencial registrado por admin y consulta del pedido. Con Cliente A intenta abrir el pedido/dirección de Cliente B: debe obtener 404/sin datos.
 
 Administrador: dashboard, producto/SEO/imagen/variante/precio, stock con motivo, pedido y transición válida, cupón, banner y configuración. Con un customer intenta invocar las mismas RPC: deben ser rechazadas.
 
-Compra crítica: comprueba coherencia entre `orders`, `order_items`, `payments`, `payment_webhook_events`, `inventory`, `inventory_movements`, `coupon_redemptions` y `shipments`. Repite el webhook y el token de checkout; no deben duplicarse orden, movimiento ni redención.
+Compra crítica: comprueba coherencia entre `orders`, `order_items`, `payments`, `inventory`, `inventory_movements`, `coupon_redemptions` y `shipments`. Repite el registro manual, cancelación y el token de checkout; no deben duplicarse orden, movimiento ni redención.
 
 Responsive/accesibilidad: revisa inicio, catálogo, producto, carrito, checkout, cuenta y admin en 390 px, 768 px y escritorio; teclado, foco, labels, mensajes y ausencia de overflow. Valida Chrome, Edge, Firefox y Safari recientes.
 
 ## 11. Observabilidad posterior al release
 
-Revisa logs de funciones Vercel por eventos JSON con `timestamp`, `level`, `event` y `errorCode`; revisa `payment_webhook_events` fallidos y `audit_logs` para precio, stock, pedido, configuración, cupón y rol. Configura alertas operativas según el plan contratado. Los logs no deben contener cookies, tokens, contraseñas, service role ni datos completos de tarjeta.
+Revisa logs de funciones Vercel por eventos JSON con `timestamp`, `level`, `event` y `errorCode`; revisa `audit_logs` y `inventory_movements` para precio, stock, pedido, configuración, cupón y rol. Configura alertas operativas según el plan contratado. Los logs no deben contener cookies, tokens, contraseñas, service role ni datos completos de tarjeta.
 
 ## 12. Rollback
 

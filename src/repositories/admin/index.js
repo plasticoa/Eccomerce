@@ -76,7 +76,7 @@ export async function getInventory({ query = "", low = false, productId = "", pa
   const range = rangeFor(page);
   const { data, error } = await supabase.rpc("admin_inventory_page", { p_search: sanitizeSearchTerm(query) || null, p_low_only: Boolean(low), p_product_id: productId || null, p_limit: ADMIN_PAGE_SIZE, p_offset: range.from });
   if (error) dbError("inventory", error);
-  const rows = (data || []).map((row) => ({ variant_id: row.variant_id, quantity: row.quantity, low_stock_threshold: row.low_stock_threshold, updated_at: row.updated_at, product_variants: { id: row.variant_id, sku: row.sku, variant_name: row.variant_name, active: row.active, product_id: row.product_id, products: { id: row.product_id, name: row.product_name } } }));
+  const rows = (data || []).map((row) => ({ variant_id: row.variant_id, quantity: row.quantity, reserved_quantity: row.reserved_quantity, available_quantity: row.available_quantity, low_stock_threshold: row.low_stock_threshold, updated_at: row.updated_at, product_variants: { id: row.variant_id, sku: row.sku, variant_name: row.variant_name, active: row.active, product_id: row.product_id, products: { id: row.product_id, name: row.product_name } } }));
   return result(rows, Number(data?.[0]?.total_count || 0), range.page);
 }
 
@@ -90,7 +90,7 @@ export async function getInventoryMovements(limit = 30) {
 export async function getAdminOrders({ query = "", status = "", payment = "", from = "", to = "", page = 1 } = {}) {
   const { supabase } = await requireInternal();
   const range = rangeFor(page);
-  let builder = supabase.from("orders").select("id,order_number,status,payment_status,total,currency,delivery_method,created_at,profiles(id,full_name)", { count: "exact" });
+  let builder = supabase.from("orders").select("id,order_number,status,payment_status,payment_method,inventory_status,total,currency,delivery_method,created_at,profiles(id,full_name)", { count: "exact" });
   if (query) builder = builder.ilike("order_number", `%${String(query).replace(/[^A-Za-z0-9-]/g, "").slice(0, 40)}%`);
   if (status) builder = builder.eq("status", status);
   if (payment) builder = builder.eq("payment_status", payment);
@@ -103,7 +103,7 @@ export async function getAdminOrders({ query = "", status = "", payment = "", fr
 
 export async function getAdminOrder(id) {
   const { supabase } = await requireInternal();
-  const { data, error } = await supabase.from("orders").select("id,profile_id,order_number,status,payment_status,subtotal,discount,shipping_total,total,currency,shipping_address,delivery_method,payment_method,created_at,profiles(id,full_name,phone),order_items(id,sku_snapshot,name_snapshot,variant_name_snapshot,unit_price,quantity,line_total),coupon_redemptions(amount_discounted,coupons(code)),payments(id,provider,provider_reference,provider_status,status,amount,currency,processed_at,created_at),shipments(id,status,delivery_method,carrier,tracking_number,estimated_at,shipped_at,delivered_at,notes)").eq("id", id).maybeSingle();
+  const { data, error } = await supabase.from("orders").select("id,profile_id,order_number,status,payment_status,subtotal,discount,shipping_total,total,currency,shipping_address,delivery_method,payment_method,inventory_status,created_at,profiles(id,full_name,phone),order_items(id,sku_snapshot,name_snapshot,variant_name_snapshot,unit_price,quantity,line_total),coupon_redemptions(amount_discounted,coupons(code)),payments(id,method,reference,notes,recorded_by,profiles!payments_recorded_by_fkey(full_name),provider,provider_reference,provider_status,status,amount,currency,processed_at,created_at),shipments(id,status,delivery_method,carrier,tracking_number,estimated_at,shipped_at,delivered_at,notes)").eq("id", id).maybeSingle();
   if (error) dbError("order", error);
   if (!data) return null;
   const { data: contact, error: contactError } = data.profile_id

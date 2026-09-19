@@ -1,4 +1,5 @@
 "use server";
+import { revalidatePath } from "next/cache";
 
 import { redirect } from "next/navigation";
 import { logServerError } from "@/lib/observability/logger";
@@ -40,5 +41,6 @@ export async function createOrderAction(_state, formData) {
     logServerError("checkout.order.failed", error, { action: "createOrder", result: "failed" });
     return { error: checkoutError(error) };
   }
+  revalidatePath("/", "layout");
   redirect(`/pedido/confirmacion/${encodeURIComponent(data.orderNumber)}`);
 }

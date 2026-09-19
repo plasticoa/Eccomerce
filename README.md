@@ -1,3 +1,5 @@
+> **Flujo vigente (19/09/2026): pagos manuales y reservas.** Checkout contra entrega/presencial con reserva inmediata y pago registrado por admin. No configurar proveedor ni webhook. Aplicar 202609190003_manual_payments_reservations.sql antes de desplegar. Ver [reporte y operación](docs/MANUAL-PAYMENTS.md). Las secciones de iteraciones anteriores sobre pasarela quedan como documentación histórica sustituida por este flujo.
+
 # Importadora Valiente — E-commerce
 
 MVP de comercio electrónico de Importadora Valiente. Incluye storefront, autenticación, carrito, checkout, pedidos, pago mediante adaptador, inventario, administración, personalización, promociones, SEO técnico y controles de release sobre Next.js y Supabase.

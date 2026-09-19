@@ -92,7 +92,8 @@ test("caché pública tiene tags y las acciones administrativas los invalidan", 
   const productRepository = readFileSync(join(root, "src/repositories/products/index.js"), "utf8");
   const actions = readFileSync(join(root, "src/features/admin/actions.js"), "utf8");
   assert.match(settingsRepository, /unstable_cache[\s\S]*site-settings/);
-  assert.match(productRepository, /unstable_cache[\s\S]*catalog-products/);
+  assert.doesNotMatch(productRepository, /unstable_cache/);
+  assert.match(productRepository, /reserved_quantity/);
   assert.match(actions, /updateTag\("catalog-products"\)/);
   assert.match(actions, /updateTag\("catalog-categories"\)/);
 });

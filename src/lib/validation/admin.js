@@ -10,10 +10,11 @@ function optionalSeoText(value, max) {
 
 export const ADMIN_ROLES = ["customer", "operator", "admin"];
 export const ORDER_TRANSITIONS = {
-  pending: ["cancelled"],
-  confirmed: ["processing"],
-  processing: ["shipped"],
-  shipped: ["delivered"],
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["processing", "cancelled"],
+  processing: ["ready", "cancelled"],
+  ready: ["shipped", "delivered", "cancelled"],
+  shipped: ["delivered", "cancelled"],
   payment_review: [],
 };
 

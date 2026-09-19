@@ -4,7 +4,8 @@ export const DELIVERY_METHODS = {
 };
 
 export const PAYMENT_METHODS = {
-  pending_gateway: { id: "pending_gateway", label: "Pago pendiente", description: "No se realizará ningún cobro en esta etapa." },
+  cash_on_delivery: { id: "cash_on_delivery", label: "Pago contra entrega", description: "Paga al recibir tu pedido." },
+  in_person: { id: "in_person", label: "Pago presencial", description: "Paga presencialmente en la tienda." },
 };
 
 export function calculateCartSubtotal(items) {

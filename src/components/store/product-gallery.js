@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { getProductImageUrl } from "@/features/catalog/catalog-utils";
+import { ProductImageFallback } from "./product-image-fallback";
 
 export function ProductGallery({ images, productName }) {
   const safeImages = images.length ? images : [{ id: "placeholder", path: "", alt: productName }];
@@ -12,7 +13,7 @@ export function ProductGallery({ images, productName }) {
   return (
     <div className="product-gallery">
       <div className="gallery-main">
-        <Image src={getProductImageUrl(selected.path)} alt={selected.alt || productName} fill priority sizes="(max-width: 760px) 100vw, 50vw" />
+        {getProductImageUrl(selected.path) ? <Image src={getProductImageUrl(selected.path)} alt={selected.alt || productName} fill priority sizes="(max-width: 760px) 100vw, 50vw" /> : <ProductImageFallback />}
       </div>
       {safeImages.length > 1 ? (
         <div className="gallery-thumbnails" role="list" aria-label="Imágenes del producto">
@@ -25,7 +26,7 @@ export function ProductGallery({ images, productName }) {
               aria-label={`Ver imagen ${index + 1}: ${image.alt || productName}`}
               aria-pressed={image.id === selected.id}
             >
-              <Image src={getProductImageUrl(image.path)} alt="" fill sizes="80px" />
+              {getProductImageUrl(image.path) ? <Image src={getProductImageUrl(image.path)} alt="" fill sizes="80px" /> : <ProductImageFallback />}
             </button>
           ))}
         </div>

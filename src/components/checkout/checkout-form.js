@@ -19,7 +19,7 @@ export function CheckoutForm({ addresses, cart, checkoutToken, profile,shippingM
 
   return <form action={action} className="checkout-layout">
     <input type="hidden" name="checkoutToken" value={checkoutToken} />
-    <input type="hidden" name="paymentMethod" value="pending_gateway" />
+
     <div className="checkout-main">
       <section className="checkout-section">
         <div className="checkout-section-heading"><span>1</span><div><h2>Datos del cliente</h2><p>{profile?.full_name || "Cliente"} · {profile?.email}{profile?.phone ? ` · ${profile.phone}` : ""}</p></div></div>
@@ -38,10 +38,10 @@ export function CheckoutForm({ addresses, cart, checkoutToken, profile,shippingM
         <div className="checkout-section-heading"><span>4</span><div><h2>Cupón</h2><p>La vigencia, monto mínimo y usos se validan nuevamente al crear el pedido.</p></div></div><div className="coupon-apply"><label className="field"><span>Código de cupón</span><input name="couponCode" value={couponCode} onChange={(event)=>setCouponCode(event.target.value)} autoComplete="off"/></label><button className="button button-secondary" type="submit" formAction={couponAction} disabled={couponPending}>{couponPending?"Validando…":"Aplicar"}</button></div>{couponState?.error?<p className="form-message error" role="alert">{couponState.error}</p>:null}{appliedCoupon?.success?<p className="form-message success" role="status">{appliedCoupon.success}</p>:null}
       </section>
       <section className="checkout-section">
-        <div className="checkout-section-heading"><span>5</span><div><h2>Pago</h2><p>El proveedor confirmará el pago mediante webhook seguro.</p></div></div>
-        <div className="checkout-option payment-pending"><span><strong>{PAYMENT_METHODS.pending_gateway.label}</strong><small>{PAYMENT_METHODS.pending_gateway.description}</small></span></div>
+        <div className="checkout-section-heading"><span>5</span><div><h2>Pago</h2><p>El pedido se crea ahora y el pago se registra cuando lo recibamos.</p></div></div>
+        <div className="option-grid">{Object.values(PAYMENT_METHODS).map((method, index) => <label className="checkout-option" key={method.id}><input type="radio" name="paymentMethod" value={method.id} defaultChecked={index === 0} required /><span><strong>{method.label}</strong><small>{method.description}</small></span></label>)}</div>
       </section>
     </div>
-    <aside className="checkout-summary"><h2>Tu pedido</h2><ul>{cart.items.map((item) => <li key={item.variantId}><span>{item.productName}<small>{item.variantName} × {item.quantity}</small></span><strong>{formatCurrency(item.lineTotal,currency)}</strong></li>)}</ul><dl><div><dt>Subtotal</dt><dd>{formatCurrency(totals.subtotal,currency)}</dd></div>{appliedCoupon?.code&&totals.discount?<div className="coupon-discount"><dt>Cupón {appliedCoupon.code}</dt><dd>-{formatCurrency(totals.discount,currency)}</dd></div>:<div><dt>Descuento</dt><dd>{formatCurrency(0,currency)}</dd></div>}<div><dt>Entrega</dt><dd>{formatCurrency(totals.shipping,currency)}</dd></div><div className="cart-total"><dt>Total</dt><dd>{formatCurrency(totals.total,currency)}</dd></div></dl>{state?.error ? <p className="form-message error" role="alert">{state.error}</p> : null}<SubmitButton pendingLabel="Creando pedido…">Crear pedido</SubmitButton><p className="checkout-disclaimer">Los precios, el cupón, la entrega y el total se recalculan en servidor antes de crear el pedido.</p></aside>
+    <aside className="checkout-summary"><h2>Tu pedido</h2><ul>{cart.items.map((item) => <li key={item.variantId}><span>{item.productName}<small>{item.variantName} × {item.quantity}</small></span><strong>{formatCurrency(item.lineTotal,currency)}</strong></li>)}</ul><dl><div><dt>Subtotal</dt><dd>{formatCurrency(totals.subtotal,currency)}</dd></div>{appliedCoupon?.code&&totals.discount?<div className="coupon-discount"><dt>Cupón {appliedCoupon.code}</dt><dd>-{formatCurrency(totals.discount,currency)}</dd></div>:<div><dt>Descuento</dt><dd>{formatCurrency(0,currency)}</dd></div>}<div><dt>Entrega</dt><dd>{formatCurrency(totals.shipping,currency)}</dd></div><div className="cart-total"><dt>Total</dt><dd>{formatCurrency(totals.total,currency)}</dd></div></dl>{state?.error ? <p className="form-message error" role="alert">{state.error}</p> : null}<SubmitButton pendingLabel="Creando pedido…">Confirmar pedido</SubmitButton><p className="checkout-disclaimer">Los precios, el cupón, la entrega y el total se recalculan en servidor antes de crear el pedido.</p></aside>
   </form>;
 }

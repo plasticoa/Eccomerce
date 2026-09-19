@@ -24,7 +24,7 @@ export function ProductVariantSelector({ variants }) {
           <div className="variant-options">
             {variants.map((variant) => (
               <label className={variant.id === selectedId ? "variant-option variant-option-active" : "variant-option"} key={variant.id}>
-                <input type="radio" name="variant" value={variant.id} checked={variant.id === selectedId} onChange={() => setSelectedId(variant.id)} />
+                <input type="radio" name="variant" value={variant.id} checked={variant.id === selectedId} onChange={() => { setSelectedId(variant.id); setQuantity(1); }} />
                 <span>{variant.name}</span>
               </label>
             ))}

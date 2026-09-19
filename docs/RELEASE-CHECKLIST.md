@@ -9,14 +9,14 @@ No marques un punto con evidencia local si depende de Supabase/Vercel reales.
 - [ ] `npm run lint`
 - [ ] `npm test`
 - [ ] `npm run build`
-- [ ] Todas las migraciones aplicadas hasta 007
+- [ ] Todas las migraciones aplicadas hasta 202609190003
 
 ## Seguridad e integridad
 
 - [ ] RLS cruzada con Cliente A/B
 - [ ] Customer y operator no ejecutan acciones admin no permitidas
 - [ ] Secrets ausentes de bundles/respuestas/logs
-- [ ] Webhook inválido 401; duplicado 2xx sin segundo movimiento
+- [ ] Webhook retirado devuelve 410; pago/cancelación repetidos sin segundo movimiento
 - [ ] Checkout ignora precios/totales manipulados
 - [ ] Dos compras concurrentes no dejan stock negativo
 - [ ] Orden conserva snapshots y dirección histórica
@@ -29,7 +29,7 @@ No marques un punto con evidencia local si depende de Supabase/Vercel reales.
 - [ ] Agregar/actualizar/eliminar carrito y persistirlo
 - [ ] Login, dirección, entrega, cupón y checkout
 - [ ] Orden única con líneas/totales/dirección/envío
-- [ ] Pago sandbox autorizado y evento trazable
+- [ ] Pago manual autorizado (solo admin) y evento trazable
 - [ ] Inventario/movimiento coherentes
 - [ ] Pedido visible para cliente y administración
 - [ ] Administración de producto, imágenes, precios, stock y pedidos
@@ -42,7 +42,7 @@ No marques un punto con evidencia local si depende de Supabase/Vercel reales.
 - [ ] Mobile/tablet/desktop sin overflow en rutas principales
 - [ ] Teclado, foco, labels, alt y errores revisados
 - [ ] Chrome, Edge, Firefox y Safari recientes
-- [ ] Logs Vercel, eventos webhook y auditoría consultables
+- [ ] Logs Vercel, movimientos y auditoría consultables
 - [ ] Backup previo verificado y restauración ensayada
 - [ ] Rollback de Vercel y responsables confirmados
 

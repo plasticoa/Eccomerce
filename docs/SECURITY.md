@@ -1,6 +1,6 @@
 # Auditoría de seguridad y matriz RLS
 
-Estado efectivo esperado después de aplicar todas las migraciones hasta `202609190001_account_admin_isolation.sql`. “Cliente CRUD” se limita siempre a filas cuya propiedad deriva de `auth.uid()`; la tabla puede imponer además RPC para mutaciones.
+Estado efectivo esperado después de aplicar todas las migraciones hasta `202609190002_product_tags.sql`. “Cliente CRUD” se limita siempre a filas cuya propiedad deriva de `auth.uid()`; la tabla puede imponer además RPC para mutaciones.
 
 | Tabla | RLS | Público SELECT | Cliente SELECT | Cliente INSERT/UPDATE/DELETE | Administración |
 |---|---:|---:|---:|---|---|
@@ -9,6 +9,8 @@ Estado efectivo esperado después de aplicar todas las migraciones hasta `202609
 | `categories` | Sí | Solo activas | Activas | No | Admin |
 | `products` | Sí | Solo publicados | Publicados | No | Admin |
 | `product_categories` | Sí | Relaciones activas | Relaciones activas | No | Admin |
+| `tags` | Sí | Asociados a productos públicos | Igual | No | Admin |
+| `product_tags` | Sí | De productos publicados | Igual | No | Admin |
 | `product_variants` | Sí | Activas de producto publicado | Igual | No | Admin |
 | `product_images` | Sí | De producto publicado | Igual | No | Admin |
 | `inventory` | Sí | De variante/producto activos | Igual | No | Lectura interna; ajuste admin por RPC |
