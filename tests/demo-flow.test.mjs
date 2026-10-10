@@ -117,24 +117,39 @@ test("demo seed, public catalog, checkout, inventory and private order access", 
     assert.equal((await asUser(a,"select variant_id from public.cart_items")).rows[0].variant_id,variantA.id);
     await asUser(b,"select public.cart_add_item($1,1)",[variantB.id]);
   });
-  await t.test("bulk deletion is admin-only, atomic and respects existing relations",async()=>{
-    const productIds=[randomUUID(),randomUUID()],categoryId=randomUUID(),couponId=randomUUID(),bannerIds=[randomUUID(),randomUUID()];
+  await t.test("bulk deletion is admin-only and handles each product according to its history",async()=>{
+    const productIds=[randomUUID(),randomUUID()],historicalProduct=randomUUID(),historicalVariant=randomUUID(),missingProduct=randomUUID(),temporaryUser=randomUUID(),categoryId=randomUUID(),couponId=randomUUID(),bannerIds=[randomUUID(),randomUUID()];
     await db.query("insert into public.products(id,name,slug,active) values($1,'Temporal A',$2,false),($3,'Temporal B',$4,false)",[productIds[0],`temporal-${productIds[0]}`,productIds[1],`temporal-${productIds[1]}`]);
+    await db.query("insert into public.products(id,name,slug,active) values($1,'Con historial',$2,true)",[historicalProduct,`historial-${historicalProduct}`]);
+    await db.query("insert into public.product_variants(id,product_id,sku,variant_name,price,active) values($1,$2,$3,'Única',10,true)",[historicalVariant,historicalProduct,`HIST-${historicalVariant}`]);
+    await db.query("insert into public.inventory(variant_id,quantity) values($1,1)",[historicalVariant]);
+    await db.query("insert into public.inventory_movements(variant_id,quantity,movement_type,reason) values($1,1,'in','Prueba')",[historicalVariant]);
     await db.query("insert into public.categories(id,name,slug,active) values($1,'Temporal',$2,false)",[categoryId,`temporal-${categoryId}`]);
     await db.query("insert into public.coupons(id,code,discount_type,discount_value,active) values($1,$2,'fixed',1,false)",[couponId,`TMP${couponId.replaceAll("-","").slice(0,8)}`]);
     for(const id of bannerIds)await db.query("insert into public.banners(id,title,image_url,active) values($1,'Temporal',$2,false)",[id,`promociones/${id}.webp`]);
+    await db.query("insert into auth.users(id,email) values($1,'temporal@example.test')",[temporaryUser]);
     const uuidArray=(ids)=>`array[${ids.map((id)=>`'${id}'::uuid`).join(",")}]`;
     await assert.rejects(asUser(a,`select public.admin_delete_products(${uuidArray(productIds)})`),/ADMIN_FORBIDDEN/);
-    const related=(await db.query("select product_id from public.product_variants where sku='DEMO-TEC-PWB-10K'")).rows[0].product_id;
-    await assert.rejects(asUser(admin,`select public.admin_delete_products(${uuidArray([productIds[0],related])})`),/foreign key/i);
-    assert.equal(await scalar("select count(*)::int n from public.products where id=$1",[productIds[0]]),1);
-    const products=(await asUser(admin,`select public.admin_delete_products(${uuidArray(productIds)}) value`)).rows[0].value;
-    assert.equal(products.count,2);
+    const products=(await asUser(admin,`select public.admin_delete_products(${uuidArray([...productIds,historicalProduct,missingProduct])}) value`)).rows[0].value;
+    assert.equal(products.hardDeleted.length,2);
+    assert.equal(products.retired.length,1);
+    assert.equal(products.failed.length,1);
+    assert.equal(await scalar("select count(*)::int n from public.products where id=any($1)",[productIds]),0);
+    assert.equal(await scalar("select count(*)::int n from public.products where id=$1 and not active",[historicalProduct]),1);
+    assert.equal(await scalar("select count(*)::int n from public.product_variants where id=$1 and not active",[historicalVariant]),1);
+    assert.equal(await scalar("select count(*)::int n from public.inventory_movements where variant_id=$1",[historicalVariant]),1);
+    assert.equal((await asUser(null,"select * from public.catalog_product_page('Con historial',null,null,null,false,24,0)",[],"anon")).rows.length,0);
     assert.equal((await asUser(admin,`select public.admin_delete_categories(${uuidArray([categoryId])}) value`)).rows[0].value,1);
-    assert.equal((await asUser(admin,`select public.admin_delete_coupons(${uuidArray([couponId])}) value`)).rows[0].value,1);
+    const coupons=(await asUser(admin,`select public.admin_delete_coupons(${uuidArray([couponId])}) value`)).rows[0].value;
+    assert.equal(coupons.hardDeleted.length,1);assert.equal(coupons.retired.length,0);
     const banners=(await asUser(admin,`select public.admin_delete_banners(${uuidArray(bannerIds)}) value`)).rows[0].value;
     assert.equal(banners.count,2);assert.equal(banners.imagePaths.length,2);
-    assert.equal(await scalar("select count(*)::int n from public.audit_logs where action in ('product.deleted','category.deleted','coupon.deleted','banner.deleted')"),6);
+    await assert.rejects(asUser(a,`select public.admin_delete_users(${uuidArray([temporaryUser])})`),/ADMIN_FORBIDDEN/);
+    const ownUser=(await asUser(admin,`select public.admin_delete_users(${uuidArray([admin])}) value`)).rows[0].value;
+    assert.equal(ownUser.hardDeleted.length,0);assert.equal(ownUser.failed[0].reason,"SELF_DELETE");
+    const users=(await asUser(admin,`select public.admin_delete_users(${uuidArray([temporaryUser])}) value`)).rows[0].value;
+    assert.equal(users.hardDeleted.length,1);assert.equal(await scalar("select count(*)::int n from auth.users where id=$1",[temporaryUser]),0);
+    assert.equal(await scalar("select count(*)::int n from public.audit_logs where action in ('product.deleted','product.retired','category.deleted','coupon.deleted','banner.deleted')"),7);
   });
   await t.test("coupon preview 100 -> 10 discount; invalid code rejected",async()=>{
     const result=(await asUser(a,"select public.validate_coupon('PruebaEstudiante',100) value")).rows[0].value;
@@ -185,6 +200,24 @@ test("demo seed, public catalog, checkout, inventory and private order access", 
     assert.equal(detail.sku_snapshot,variantA.sku); assert.equal(detail.total,orderA.total);
     assert.equal((await asUser(a,"select * from public.coupon_redemptions where order_id=$1",[orderA.id])).rows.length,1);
     assert.equal((await asUser(b,"select * from public.coupon_redemptions where order_id=$1",[orderA.id])).rows.length,0);
+  });
+  await t.test("used coupons and users with orders retain their historical records",async()=>{
+    const uuidArray=(ids)=>`array[${ids.map((id)=>`'${id}'::uuid`).join(",")}]`;
+    const couponId=(await db.query("select id from public.coupons where code='PRUEBAESTUDIANTE'")).rows[0].id;
+    const coupons=(await asUser(admin,`select public.admin_delete_coupons(${uuidArray([couponId])}) value`)).rows[0].value;
+    assert.equal(coupons.hardDeleted.length,0);assert.equal(coupons.retired.length,1);
+    assert.equal(await scalar("select count(*)::int n from public.coupons where id=$1 and not active",[couponId]),1);
+    assert.equal(await scalar("select count(*)::int n from public.coupon_redemptions where coupon_id=$1",[couponId]),1);
+    const users=(await asUser(admin,`select public.admin_delete_users(${uuidArray([a])}) value`)).rows[0].value;
+    assert.equal(users.hardDeleted.length,0);assert.equal(users.failed[0].reason,"ORDER_HISTORY");
+    assert.equal(await scalar("select count(*)::int n from public.profiles where id=$1",[a]),1);
+    const productId=(await db.query("select product_id from public.product_variants where id=$1",[variantA.id])).rows[0].product_id;
+    const products=(await asUser(admin,`select public.admin_delete_products(${uuidArray([productId])}) value`)).rows[0].value;
+    assert.equal(products.hardDeleted.length,0);assert.equal(products.retired.length,1);
+    assert.equal(await scalar("select count(*)::int n from public.order_items where order_id=$1 and variant_id=$2",[orderA.id,variantA.id]),1);
+    assert.equal(await scalar("select count(*)::int n from public.products where id=$1 and not active",[productId]),1);
+    assert.equal(await scalar("select count(*)::int n from public.product_variants where id=$1 and not active",[variantA.id]),1);
+    await assert.rejects(asUser(b,"select public.cart_add_item($1,1)",[variantA.id]),/VARIANT_UNAVAILABLE/);
   });
   await t.test("historical unit price survives a catalog price change",async()=>{
     await db.query("update public.product_variants set price=price+50 where id=$1",[variantA.id]);

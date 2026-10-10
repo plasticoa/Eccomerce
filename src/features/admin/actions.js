@@ -11,6 +11,7 @@ function refreshCatalog() { updateTag("catalog-products"); updateTag("catalog-ca
 function selectedIds(formData) {
   return [...new Set(formData.getAll("ids").map(String).filter(isAdminUuid))].slice(0, 100);
 }
+function resultCount(data, key) { return Array.isArray(data?.[key]) ? data[key].length : 0; }
 function friendly(error, fallback) {
   const text = String(error?.message || "");
   if (text.includes("duplicate") || text.includes("23505")) return "El slug o SKU ya existe.";
@@ -35,8 +36,15 @@ export async function deleteProductsAction(_state, formData) {
     const paths = Array.isArray(data?.imagePaths) ? data.imagePaths.filter(Boolean) : [];
     const storage = paths.length ? await supabase.storage.from("products").remove(paths) : { error: null };
     refreshCatalog(); revalidatePath("/admin/productos"); revalidatePath("/admin/inventario"); revalidatePath("/productos");
-    const count = Number(data?.count || 0);
-    return { success: storage.error ? `${count} producto(s) eliminado(s); algunas imágenes no pudieron limpiarse de Storage.` : `${count} producto(s) eliminado(s).` };
+    const deleted = resultCount(data, "hardDeleted");
+    const retired = resultCount(data, "retired");
+    const failed = resultCount(data, "failed");
+    const parts = [`${deleted} eliminado(s) definitivamente`, `${retired} retirado(s) del catálogo`];
+    if (storage.error) parts.push("algunas imágenes no pudieron limpiarse de Storage");
+    return {
+      success: parts.join(" · ") + ".",
+      warning: failed ? `${failed} producto(s) no se pudieron procesar por restricciones o porque ya no existen.` : "",
+    };
   } catch (error) { return { error: friendly(error, "No se pudieron eliminar los productos seleccionados.") }; }
 }
 
@@ -50,6 +58,23 @@ export async function deleteCategoriesAction(_state, formData) {
     refreshCatalog(); revalidatePath("/admin/categorias"); revalidatePath("/categorias");
     return { success: `${Number(data || 0)} categoría(s) eliminada(s).` };
   } catch (error) { return { error: friendly(error, "No se pudieron eliminar las categorías seleccionadas.") }; }
+}
+
+export async function deleteUsersAction(_state, formData) {
+  try {
+    const ids = selectedIds(formData);
+    if (!ids.length) return { error: "Selecciona al menos un usuario." };
+    const { supabase } = await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_delete_users", { p_ids: ids });
+    if (error) throw error;
+    revalidatePath("/admin/usuarios"); revalidatePath("/admin/clientes");
+    const deleted = resultCount(data, "hardDeleted");
+    const failed = resultCount(data, "failed");
+    return {
+      success: `${deleted} usuario(s) eliminado(s) definitivamente.`,
+      warning: failed ? `${failed} usuario(s) se conservaron: no se puede eliminar la cuenta actual, el último administrador ni usuarios con pedidos.` : "",
+    };
+  } catch (error) { return { error: friendly(error, "No se pudieron eliminar los usuarios seleccionados.") }; }
 }
 
 export async function saveCategoryAction(_state, formData) {

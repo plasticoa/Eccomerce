@@ -10,13 +10,14 @@ const loginPage=read("src/app/auth/login/page.js");
 const callback=read("src/app/auth/callback/route.js");
 
 test("all deletable admin CRUDs use the shared bulk-selection flow",()=>{
-  const pages=["productos","categorias","promociones","personalizacion"].map((name)=>read(`src/app/admin/${name}/page.js`));
+  const pages=["productos","categorias","promociones","personalizacion","usuarios"].map((name)=>read(`src/app/admin/${name}/page.js`));
   for(const page of pages){assert.match(page,/BulkSelection/);assert.match(page,/BulkSelectionCheckbox/);assert.match(page,/BulkSelectAllCheckbox/);}
   assert.match(component,/Confirmar eliminación/);
   assert.match(component,/>Cancelar</);
-  assert.match(component,/pending \? "Eliminando…"/);
+  assert.match(component,/pending \? "Procesando…"/);
   assert.match(component,/state\?\.error[\s\S]*role="alert"/);
   assert.match(component,/state\?\.success[\s\S]*role="status"/);
+  assert.match(component,/AdminDeleteButton/);
 });
 
 test("admin login and account access redirect server-side while normal next is preserved",()=>{

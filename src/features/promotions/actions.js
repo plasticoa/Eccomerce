@@ -13,8 +13,8 @@ const messageFor={COUPON_NOT_FOUND:"El cupón no existe.",COUPON_INACTIVE:"El cu
 function friendly(error){const message=String(error?.message||"");if(message.includes("duplicate")||message.includes("23505"))return"Ya existe un cupón con ese código.";if(message.includes("INVALID_DATE_RANGE"))return"El rango de vigencia no es válido.";return"No se pudo guardar el cupón.";}
 
 export async function deleteCouponsAction(_state,formData){
-  try{const ids=[...new Set(formData.getAll("ids").map(String).filter(isAdminUuid))].slice(0,100);if(!ids.length)return{error:"Selecciona al menos un cupón."};const {supabase}=await requireAdmin();const {data,error}=await supabase.rpc("admin_delete_coupons",{p_ids:ids});if(error)throw error;revalidatePath("/admin/promociones");return{success:`${Number(data||0)} cupón(es) eliminado(s).`};}
-  catch(error){const message=String(error?.message||"");if(message.includes("23503")||message.includes("foreign key"))return{error:"No se puede eliminar un cupón que ya fue utilizado en un pedido."};return{error:"No se pudieron eliminar los cupones seleccionados."};}
+  try{const ids=[...new Set(formData.getAll("ids").map(String).filter(isAdminUuid))].slice(0,100);if(!ids.length)return{error:"Selecciona al menos un cupón."};const {supabase}=await requireAdmin();const {data,error}=await supabase.rpc("admin_delete_coupons",{p_ids:ids});if(error)throw error;revalidatePath("/admin/promociones");const deleted=Array.isArray(data?.hardDeleted)?data.hardDeleted.length:0;const retired=Array.isArray(data?.retired)?data.retired.length:0;const failed=Array.isArray(data?.failed)?data.failed.length:0;return{success:`${deleted} eliminado(s) definitivamente · ${retired} desactivado(s) por historial de uso.`,warning:failed?`${failed} cupón(es) no se pudieron procesar.`:""};}
+  catch{return{error:"No se pudieron eliminar los cupones seleccionados."};}
 }
 
 export async function saveCouponAction(_state,formData){
