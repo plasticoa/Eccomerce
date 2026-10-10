@@ -117,6 +117,25 @@ test("demo seed, public catalog, checkout, inventory and private order access", 
     assert.equal((await asUser(a,"select variant_id from public.cart_items")).rows[0].variant_id,variantA.id);
     await asUser(b,"select public.cart_add_item($1,1)",[variantB.id]);
   });
+  await t.test("bulk deletion is admin-only, atomic and respects existing relations",async()=>{
+    const productIds=[randomUUID(),randomUUID()],categoryId=randomUUID(),couponId=randomUUID(),bannerIds=[randomUUID(),randomUUID()];
+    await db.query("insert into public.products(id,name,slug,active) values($1,'Temporal A',$2,false),($3,'Temporal B',$4,false)",[productIds[0],`temporal-${productIds[0]}`,productIds[1],`temporal-${productIds[1]}`]);
+    await db.query("insert into public.categories(id,name,slug,active) values($1,'Temporal',$2,false)",[categoryId,`temporal-${categoryId}`]);
+    await db.query("insert into public.coupons(id,code,discount_type,discount_value,active) values($1,$2,'fixed',1,false)",[couponId,`TMP${couponId.replaceAll("-","").slice(0,8)}`]);
+    for(const id of bannerIds)await db.query("insert into public.banners(id,title,image_url,active) values($1,'Temporal',$2,false)",[id,`promociones/${id}.webp`]);
+    const uuidArray=(ids)=>`array[${ids.map((id)=>`'${id}'::uuid`).join(",")}]`;
+    await assert.rejects(asUser(a,`select public.admin_delete_products(${uuidArray(productIds)})`),/ADMIN_FORBIDDEN/);
+    const related=(await db.query("select product_id from public.product_variants where sku='DEMO-TEC-PWB-10K'")).rows[0].product_id;
+    await assert.rejects(asUser(admin,`select public.admin_delete_products(${uuidArray([productIds[0],related])})`),/foreign key/i);
+    assert.equal(await scalar("select count(*)::int n from public.products where id=$1",[productIds[0]]),1);
+    const products=(await asUser(admin,`select public.admin_delete_products(${uuidArray(productIds)}) value`)).rows[0].value;
+    assert.equal(products.count,2);
+    assert.equal((await asUser(admin,`select public.admin_delete_categories(${uuidArray([categoryId])}) value`)).rows[0].value,1);
+    assert.equal((await asUser(admin,`select public.admin_delete_coupons(${uuidArray([couponId])}) value`)).rows[0].value,1);
+    const banners=(await asUser(admin,`select public.admin_delete_banners(${uuidArray(bannerIds)}) value`)).rows[0].value;
+    assert.equal(banners.count,2);assert.equal(banners.imagePaths.length,2);
+    assert.equal(await scalar("select count(*)::int n from public.audit_logs where action in ('product.deleted','category.deleted','coupon.deleted','banner.deleted')"),6);
+  });
   await t.test("coupon preview 100 -> 10 discount; invalid code rejected",async()=>{
     const result=(await asUser(a,"select public.validate_coupon('PruebaEstudiante',100) value")).rows[0].value;
     assert.equal(result.valid,true); assert.equal(result.discount,10);

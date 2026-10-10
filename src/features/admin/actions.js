@@ -8,6 +8,9 @@ import { ADMIN_ROLES, allowedOrderTransitions, isAdminUuid, validateCategoryInpu
 
 function bool(formData, name) { return formData.get(name) === "on" || formData.get(name) === "true"; }
 function refreshCatalog() { updateTag("catalog-products"); updateTag("catalog-categories"); }
+function selectedIds(formData) {
+  return [...new Set(formData.getAll("ids").map(String).filter(isAdminUuid))].slice(0, 100);
+}
 function friendly(error, fallback) {
   const text = String(error?.message || "");
   if (text.includes("duplicate") || text.includes("23505")) return "El slug o SKU ya existe.";
@@ -18,7 +21,35 @@ function friendly(error, fallback) {
   if (text.includes("LEGACY_ORDER_REQUIRES_REVIEW")) return "Este pedido histórico requiere revisar su pago e inventario antes de continuar.";
   if (text.includes("LAST_ADMIN")) return "No puedes quitar el acceso al último administrador.";
   if (text.includes("FORBIDDEN")) return "No tienes permisos para realizar esta operación.";
+  if (text.includes("23503") || text.includes("foreign key")) return "No se puede eliminar porque existen pedidos, movimientos de inventario u otros registros relacionados.";
   return fallback;
+}
+
+export async function deleteProductsAction(_state, formData) {
+  try {
+    const ids = selectedIds(formData);
+    if (!ids.length) return { error: "Selecciona al menos un producto." };
+    const { supabase } = await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_delete_products", { p_ids: ids });
+    if (error) throw error;
+    const paths = Array.isArray(data?.imagePaths) ? data.imagePaths.filter(Boolean) : [];
+    const storage = paths.length ? await supabase.storage.from("products").remove(paths) : { error: null };
+    refreshCatalog(); revalidatePath("/admin/productos"); revalidatePath("/admin/inventario"); revalidatePath("/productos");
+    const count = Number(data?.count || 0);
+    return { success: storage.error ? `${count} producto(s) eliminado(s); algunas imágenes no pudieron limpiarse de Storage.` : `${count} producto(s) eliminado(s).` };
+  } catch (error) { return { error: friendly(error, "No se pudieron eliminar los productos seleccionados.") }; }
+}
+
+export async function deleteCategoriesAction(_state, formData) {
+  try {
+    const ids = selectedIds(formData);
+    if (!ids.length) return { error: "Selecciona al menos una categoría." };
+    const { supabase } = await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_delete_categories", { p_ids: ids });
+    if (error) throw error;
+    refreshCatalog(); revalidatePath("/admin/categorias"); revalidatePath("/categorias");
+    return { success: `${Number(data || 0)} categoría(s) eliminada(s).` };
+  } catch (error) { return { error: friendly(error, "No se pudieron eliminar las categorías seleccionadas.") }; }
 }
 
 export async function saveCategoryAction(_state, formData) {

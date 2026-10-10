@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import { AuthForm, AuthLink } from "@/components/ui/auth-form";
 import { loginAction } from "@/features/auth/actions";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 
 export const metadata = { title: "Iniciar sesión" };
 
 export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
   const next = typeof params?.next === "string" && params.next.startsWith("/") && !params.next.startsWith("//") ? params.next : "/cuenta";
-  if (await getCurrentUser()) redirect(next);
+  if (await getCurrentUser()) {
+    const profile = await getCurrentProfile();
+    redirect(profile?.role === "admin" ? "/admin/dashboard" : next);
+  }
   return (
     <section className="auth-card">
       <p className="eyebrow">Bienvenido de nuevo</p>

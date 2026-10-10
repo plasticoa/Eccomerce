@@ -16,9 +16,14 @@ export async function loginAction(_previousState, formData) {
   if (!email || !password) return { error: "Ingresa tu correo y contraseña." };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "No fue posible iniciar sesión. Verifica tus datos." };
-  redirect(safeInternalPath(formData.get("next"), "/cuenta"));
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+  if (profileError || !profile) {
+    await supabase.auth.signOut();
+    return { error: "No fue posible cargar el perfil de la cuenta." };
+  }
+  redirect(profile.role === "admin" ? "/admin/dashboard" : safeInternalPath(formData.get("next"), "/cuenta"));
 }
 
 export async function registerAction(_previousState, formData) {

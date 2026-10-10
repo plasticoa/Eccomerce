@@ -6,10 +6,16 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getAuthenticatedCart } from "@/repositories/carts";
 import { validateCouponInput } from "@/lib/validation/settings";
+import { isAdminUuid } from "@/lib/validation/admin";
 
 const bool=(formData,name)=>formData.get(name)==="on"||formData.get(name)==="true";
 const messageFor={COUPON_NOT_FOUND:"El cupón no existe.",COUPON_INACTIVE:"El cupón está inactivo.",COUPON_EXPIRED:"El cupón expiró.",COUPON_NOT_STARTED:"El cupón todavía no está vigente.",COUPON_MINIMUM:"El carrito no alcanza el monto mínimo.",COUPON_LIMIT_REACHED:"El cupón alcanzó su límite de usos."};
 function friendly(error){const message=String(error?.message||"");if(message.includes("duplicate")||message.includes("23505"))return"Ya existe un cupón con ese código.";if(message.includes("INVALID_DATE_RANGE"))return"El rango de vigencia no es válido.";return"No se pudo guardar el cupón.";}
+
+export async function deleteCouponsAction(_state,formData){
+  try{const ids=[...new Set(formData.getAll("ids").map(String).filter(isAdminUuid))].slice(0,100);if(!ids.length)return{error:"Selecciona al menos un cupón."};const {supabase}=await requireAdmin();const {data,error}=await supabase.rpc("admin_delete_coupons",{p_ids:ids});if(error)throw error;revalidatePath("/admin/promociones");return{success:`${Number(data||0)} cupón(es) eliminado(s).`};}
+  catch(error){const message=String(error?.message||"");if(message.includes("23503")||message.includes("foreign key"))return{error:"No se puede eliminar un cupón que ya fue utilizado en un pedido."};return{error:"No se pudieron eliminar los cupones seleccionados."};}
+}
 
 export async function saveCouponAction(_state,formData){
   try{const {supabase}=await requireAdmin();const id=String(formData.get("id")||"");const validation=validateCouponInput({code:formData.get("code"),description:formData.get("description"),discountType:formData.get("discountType"),discountValue:formData.get("discountValue"),minimumOrder:formData.get("minimumOrder"),usageLimit:formData.get("usageLimit"),active:bool(formData,"active"),startsAt:formData.get("startsAt"),endsAt:formData.get("endsAt")});if(validation.error)return{error:validation.error};const data=validation.data;

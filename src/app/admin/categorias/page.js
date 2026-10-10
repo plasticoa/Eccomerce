@@ -1,6 +1,7 @@
 import { AdminActionForm, AdminStatus } from "@/components/admin/admin-ui";
+import { BulkSelection, BulkSelectionCheckbox, BulkSelectAllCheckbox } from "@/components/admin/bulk-selection";
 import { AdminPageHeader } from "@/components/admin/page-header";
-import { saveCategoryAction } from "@/features/admin/actions";
+import { deleteCategoriesAction, saveCategoryAction } from "@/features/admin/actions";
 import { getAdminCategories } from "@/repositories/admin";
 
 export const metadata = { title: "Categorías · Administración" };
@@ -11,5 +12,6 @@ function CategoryFields({ category = {} }) {
 
 export default async function CategoriesPage() {
   const categories = await getAdminCategories();
-  return <section><AdminPageHeader title="Categorías" description="Organiza la navegación pública sin eliminar productos relacionados." /><details className="admin-disclosure"><summary>Nueva categoría</summary><AdminActionForm action={saveCategoryAction} submitLabel="Crear categoría"><CategoryFields /></AdminActionForm></details><div className="admin-card-list">{categories.map((category) => <details className="admin-disclosure" key={category.id}><summary><span><strong>{category.name}</strong><small>/{category.slug} · {category.product_categories?.[0]?.count || 0} productos</small></span><AdminStatus active={category.active} /></summary><AdminActionForm action={saveCategoryAction} submitLabel="Actualizar categoría"><CategoryFields category={category} /></AdminActionForm></details>)}</div></section>;
+  const visibleIds = categories.map((category) => category.id);
+  return <section><AdminPageHeader title="Categorías" description="Organiza la navegación pública sin eliminar productos relacionados." /><details className="admin-disclosure"><summary>Nueva categoría</summary><AdminActionForm action={saveCategoryAction} submitLabel="Crear categoría"><CategoryFields /></AdminActionForm></details>{categories.length ? <BulkSelection action={deleteCategoriesAction} visibleIds={visibleIds} entityLabel="categoría(s)"><label className="bulk-select-all-line"><BulkSelectAllCheckbox /> Seleccionar todas las categorías visibles</label><div className="admin-card-list">{categories.map((category) => <details className="admin-disclosure" key={category.id}><summary><BulkSelectionCheckbox id={category.id} label={category.name} /><span><strong>{category.name}</strong><small>/{category.slug} · {category.product_categories?.[0]?.count || 0} productos</small></span><AdminStatus active={category.active} /></summary><AdminActionForm action={saveCategoryAction} submitLabel="Actualizar categoría"><CategoryFields category={category} /></AdminActionForm></details>)}</div></BulkSelection> : null}</section>;
 }

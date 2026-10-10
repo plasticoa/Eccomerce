@@ -10,8 +10,15 @@ export async function GET(request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(next, url.origin));
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) {
+      let destination = next;
+      if (next === "/cuenta" || next.startsWith("/cuenta/")) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+        if (profile?.role === "admin") destination = "/admin/dashboard";
+      }
+      return NextResponse.redirect(new URL(destination, url.origin));
+    }
   }
   return NextResponse.redirect(new URL("/auth/error", url.origin));
 }

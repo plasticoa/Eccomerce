@@ -5,6 +5,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { requireAdmin } from "@/services/admin/authorization";
 import { validateBannerInput, validateSiteSettingsInput } from "@/lib/validation/settings";
 import { normalizeSettings } from "@/features/settings/settings-utils";
+import { isAdminUuid } from "@/lib/validation/admin";
 
 const IMAGE_TYPES=new Map([["image/jpeg","jpg"],["image/png","png"],["image/webp","webp"]]);
 const SITE_SETTINGS_SELECT="id,store_name,logo_url,favicon_url,primary_color,secondary_color,accent_color,currency,contact_data,social_links,home_content,footer_content,seo_title,seo_description,social_image_url,canonical_domain,created_at,updated_at";
@@ -62,6 +63,11 @@ export async function deleteBannerAction(formData){
   const {supabase}=await requireAdmin();const id=value(formData,"id");if(!id)return;
   const result=await supabase.rpc("admin_delete_banner",{p_id:id});if(result.error)return;
   if(result.data&&!/^https?:\/\//i.test(result.data))await supabase.storage.from("banners").remove([result.data]);settingsPaths();
+}
+
+export async function deleteBannersAction(_state,formData){
+  try{const ids=[...new Set(formData.getAll("ids").map(String).filter(isAdminUuid))].slice(0,100);if(!ids.length)return{error:"Selecciona al menos un banner."};const {supabase}=await requireAdmin();const {data,error}=await supabase.rpc("admin_delete_banners",{p_ids:ids});if(error)throw error;const paths=Array.isArray(data?.imagePaths)?data.imagePaths.filter((path)=>path&&!/^https?:\/\//i.test(path)):[];const storage=paths.length?await supabase.storage.from("banners").remove(paths):{error:null};settingsPaths();const count=Number(data?.count||0);return{success:storage.error?`${count} banner(s) eliminado(s); algunas imágenes no pudieron limpiarse de Storage.`:`${count} banner(s) eliminado(s).`};}
+  catch(error){return{error:friendly(error,"No se pudieron eliminar los banners seleccionados.")};}
 }
 
 export async function saveShippingMethodAction(_state,formData){
